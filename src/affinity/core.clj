@@ -1,7 +1,4 @@
-(ns affinity.core)
-
-
-(comment
+(ns affinity.core
   "All matrices are held in the form
    [[0,1,2]
     [3,4,5]
@@ -36,6 +33,12 @@
   [m]
   (count (first m)))
 
+(defn matrix-diff
+  "Returns the sum of the absolute differences between
+   matrices `m1` and `m2`"
+  [m1 m2]
+  (reduce + (map (fn [a b] (Math/abs (- a b))) (apply concat m1) (apply concat m2))))
+
 (defn range-without
   "Returns a sequence of numbers starting at `start` (inclusive) and
    ending at `end` (exclusive), without the elements in the set `skip`."
@@ -63,24 +66,36 @@
         (min 0 (+ (idx r k k) (reduce + (map (fn [i'] (max 0 (idx r i' k))) (range-without 0 (nrows r) #{i k})))))
         (reduce + (map (fn [i'] (max 0 (idx r i' k))) (range-without 0 (nrows r) #{k})))))))
 
+(defn c
+  "Return the criterion matrix, given an iteration of running the
+   algorithm - the parameter should be a map with keys `:r` and `:a`
+   which are the responsibility and availability matrices respectively."
+
+  [{:keys [r a]}]
+
+  (for [i (range (nrows r))]
+    (for [k (range (ncols r))]
+      (+ (idx r i k) (idx a i k)))))
+
+(defn exemplar
+  [c n]
+  (first (apply max-key second (map-indexed (fn [i v] [i v]) (nth c n)))))
+
 (defn run
-  "Run the affinity algorithm `iterations` times. `s` is a similarity function
-   and there are `n` elements to consider"
+  "Returns a lazy sequence of all iterations of the affinity algorithm.
+  `s` is a similarity function and there are `n` elements to consider"
 
-  [s n iterations]
+  [s n]
 
-  (let [am        (init n n (constantly 0))
-        iteration (comp a (partial r s))
-        last-a    (last (take iterations (iterate iteration am)))]
-    {:a last-a
-     :r (r s last-a)}))
+  (let [vs {:r (init n n (constantly 0))
+            :a (init n n (constantly 0))}
+        iteration #(let [r-intermediate (r s (:a %))]
+                    {:r r-intermediate
+                     :a (a r-intermediate)})]
+    (iterate iteration vs)))
 
 (defn exemplars
-  "Returns a sequence of the indices of the exemplars, given a responsibility
-   matrix `r`"
-  [r]
-  (->> (nrows r)
-       range
-       (map #(idx x % %))
-       (map-indexed #(if (pos? %2) %1))
-       (remove nil?)))
+  "Returns a sequence of the indices of the exemplars, given a criterion
+   matrix `c`"
+  [c]
+  (group-by #(exemplar c %) (range (nrows c))))
