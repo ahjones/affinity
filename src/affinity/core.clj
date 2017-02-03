@@ -8,6 +8,8 @@
    and kth column of the matrix, counting from the top
    left.")
 
+(def damping 0.8)
+
 (defn init
   "Return a new matrix with `nrows` rows, `ncols` cols and
    which has at each index the value of `(f i k)` where `i`
@@ -38,6 +40,18 @@
    matrices `m1` and `m2`"
   [m1 m2]
   (reduce + (map (fn [a b] (Math/abs (- a b))) (apply concat m1) (apply concat m2))))
+
+(defn m*
+  "Multiply matrix `m` by scalar value `s`"
+  [m s]
+  (for [i (range (nrows m))]
+    (for [k (range (ncols m))]
+      (* s (idx m i k)))))
+
+(defn m+
+  "Add matrix `m1` to matrix `m2` elementiwise"
+  [m1 m2]
+  (map (fn [r1 r2] (map + r1 r2)) m1 m2))
 
 (defn range-without
   "Returns a sequence of numbers starting at `start` (inclusive) and
@@ -90,8 +104,8 @@
   (let [vs {:r (init n n (constantly 0))
             :a (init n n (constantly 0))}
         iteration #(let [r-intermediate (r s (:a %))]
-                    {:r r-intermediate
-                     :a (a r-intermediate)})]
+                     {:r (m+ (m* r-intermediate (- 1 damping)) (m* (:r %) damping))
+                      :a (m+ (m* (a r-intermediate) (- 1 damping)) (m* (:a %) damping))})]
     (iterate iteration vs)))
 
 (defn exemplars
